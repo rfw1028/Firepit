@@ -1,0 +1,16 @@
+[Unit]
+Description=FirePit independent igniter watchdog (owns Relay B/BCM 6 — dead-man, no reboot)
+# Starts regardless of the main app; it waits for a fresh heartbeat before arming.
+After=multi-user.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/python3 /opt/firepit-igniter-watchdog/igniter_watchdog.py
+Environment=FIREPIT_IGNITER_HEARTBEAT=/run/firepit/igniter-heartbeat
+Environment=FIREPIT_IGNITER_CUT_S=1.5
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=multi-user.target

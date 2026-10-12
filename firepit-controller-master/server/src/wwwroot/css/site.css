@@ -1,0 +1,163 @@
+html {
+  font-size: 14px;
+}
+
+@media (min-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
+  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+}
+
+html {
+  position: relative;
+  min-height: 100%;
+}
+
+body {
+  margin-bottom: 60px;
+}
+
+.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
+  color: var(--bs-secondary-color);
+  text-align: end;
+}
+
+.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
+  text-align: start;
+}
+
+/* ============================================================
+   Fire Pit control panel
+   Tweak the variables in `.firepit` below to re-theme the whole
+   page (colors, spacing, roundness). Markup: Pages/Index.cshtml.
+   ============================================================ */
+.firepit {
+  --fp-max-width: 640px;
+  --fp-accent: #ff6a00;      /* fire orange (primary action)   */
+  --fp-on:     #d32f2f;      /* gas ON / close (red)           */
+  --fp-off:    #2e7d32;      /* gas OFF / open (green)         */
+  --fp-info:   #0277bd;      /* valve position (blue)          */
+  --fp-warn:   #f9a825;      /* valve offline (amber)          */
+  --fp-card-bg: #ffffff;
+  --fp-border: #e4e4e7;
+  --fp-text:   #1b1b1f;
+  --fp-muted:  #70707a;
+  --fp-radius: 16px;
+  --fp-gap:    1rem;
+
+  max-width: var(--fp-max-width);
+  margin: 0 auto;
+  padding: 1rem;
+  color: var(--fp-text);
+}
+
+.fp-title { font-size: 1.6rem; font-weight: 700; margin: 0 0 1.25rem; }
+
+.fp-card {
+  background: var(--fp-card-bg);
+  border: 1px solid var(--fp-border);
+  border-radius: var(--fp-radius);
+  padding: 1.1rem 1.15rem;
+  margin-bottom: var(--fp-gap);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .06);
+}
+
+.fp-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.fp-card-head h2 { font-size: 1.1rem; font-weight: 600; margin: 0; }
+
+.fp-badge {
+  font-size: .95rem;
+  font-weight: 700;
+  padding: .3rem .7rem;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--fp-muted);
+  white-space: nowrap;
+}
+.fp-badge--on   { background: var(--fp-on); }
+.fp-badge--off  { background: var(--fp-off); }
+.fp-badge--info { background: var(--fp-info); }
+.fp-badge--warn { background: var(--fp-warn); color: #1b1b1f; }
+
+.fp-btn-row { display: flex; gap: .6rem; margin-bottom: .75rem; flex-wrap: wrap; }
+
+.fp-btn {
+  flex: 1 1 auto;
+  min-height: 3rem;
+  padding: .6rem 1rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  color: #fff;
+  background: var(--fp-muted);
+  transition: filter .12s ease, transform .02s ease;
+}
+.fp-btn:hover  { filter: brightness(1.05); }
+.fp-btn:active { transform: translateY(1px); }
+.fp-btn--open    { background: var(--fp-off); }
+.fp-btn--close   { background: var(--fp-on); }
+.fp-btn--primary { background: var(--fp-accent); }
+.fp-btn--ghost {
+  flex: 0 0 auto;
+  min-width: 3.5rem;
+  background: #fff;
+  color: var(--fp-text);
+  border-color: var(--fp-border);
+}
+
+.fp-valve-row { display: flex; align-items: center; gap: 1rem; margin-bottom: .75rem; }
+
+.fp-slider {
+  flex: 1 1 auto;
+  height: 2rem;
+  accent-color: var(--fp-accent);
+  cursor: pointer;
+}
+
+.fp-input-wrap {
+  display: flex;
+  align-items: stretch;
+  width: 7.5rem;
+  border: 1px solid var(--fp-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.fp-number {
+  width: 100%;
+  border: 0;
+  padding: .5rem .6rem;
+  font-size: 1.1rem;
+  text-align: right;
+  -moz-appearance: textfield;
+}
+.fp-number:focus { outline: 2px solid var(--fp-accent); outline-offset: -2px; }
+.fp-input-suffix {
+  display: flex;
+  align-items: center;
+  padding: 0 .6rem;
+  background: #f3f3f5;
+  color: var(--fp-muted);
+  font-weight: 600;
+}
+
+.fp-note { font-size: .85rem; color: var(--fp-muted); margin: .5rem 0 0; }
+
+.fp-error {
+  background: #fff3cd;
+  border: 1px solid #ffe69c;
+  color: #664d03;
+  border-radius: 10px;
+  padding: .7rem .9rem;
+  margin-top: 1rem;
+}

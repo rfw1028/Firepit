@@ -1,0 +1,20 @@
+[Unit]
+Description=FirePit flame detector (advisory; motion + colour fusion; publishes /run/firepit-flame/flame.json)
+After=network-online.target firepit-camera.service
+Wants=firepit-camera.service
+
+[Service]
+User=pi
+ExecStart=/usr/bin/python3 /opt/firepit-camera/flame_detector.py
+# Flag file lives in its own tmpfs dir, independent of the gas app's /run/firepit.
+RuntimeDirectory=firepit-flame
+RuntimeDirectoryMode=0755
+# Analyse only the fire-pit area (fractions x0,y0,x1,y1 of the frame). Adjust if the camera moves.
+Environment=FIREPIT_FLAME_ROI=0.35,0.0,0.92,0.55
+Restart=always
+RestartSec=3
+Nice=10
+MemoryMax=200M
+
+[Install]
+WantedBy=multi-user.target

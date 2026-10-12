@@ -1,0 +1,18 @@
+[Unit]
+Description=FirePit independent safety watchdog (owns CH3/BCM 21 — dead-man + reboot)
+# Starts regardless of the main app; it waits for a fresh heartbeat before arming.
+After=multi-user.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/python3 /opt/firepit-watchdog/watchdog.py
+Environment=FIREPIT_HEARTBEAT=/run/firepit/heartbeat
+Environment=FIREPIT_GAS_CUT_S=1.0
+Environment=FIREPIT_REBOOT_S=5.0
+Environment=FIREPIT_ALLOW_REBOOT=1
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,16 @@
+[Unit]
+Description=FirePit Tuya ball-valve shim (protocol 3.5 bridge, localhost:5006)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/opt/firepit-valve
+EnvironmentFile=/etc/firepit/valve.env
+ExecStart=/opt/firepit-valve/venv/bin/python /opt/firepit-valve/valve_shim.py
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

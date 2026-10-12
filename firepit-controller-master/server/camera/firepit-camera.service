@@ -1,0 +1,18 @@
+[Unit]
+Description=FirePit USB camera MJPEG stream (viewer page on :8081; independent of the gas controller)
+After=network-online.target
+
+[Service]
+User=pi
+SupplementaryGroups=video
+# Tuning: adaptive exposure + backlight compensation (lifts a ground-level flame against a bright sky).
+ExecStartPre=-/usr/bin/v4l2-ctl -d /dev/video0 -c auto_exposure=3,backlight_compensation=2,brightness=-8
+ExecStart=/usr/bin/python3 /opt/firepit-camera/camera_stream.py
+Restart=always
+RestartSec=3
+# Keep the camera from ever competing with the safety services.
+Nice=10
+MemoryMax=250M
+
+[Install]
+WantedBy=multi-user.target

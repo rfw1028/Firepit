@@ -1,0 +1,28 @@
+[Unit]
+Description=FirePit Controller (main app — owns CH1/CH2 gas relays, BCM 26/20)
+After=network-online.target firepit-valve.service
+Wants=network-online.target
+
+[Service]
+Type=notify
+User=pi
+WorkingDirectory=/opt/firepit
+ExecStart=/usr/local/bin/dotnet /opt/firepit/FirepitController.dll
+Environment=ASPNETCORE_URLS=http://0.0.0.0:80
+Environment=DOTNET_ENVIRONMENT=Production
+# Allow binding privileged port 80 while still running as a non-root user.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+# Heartbeat lives here (tmpfs); watchdog polls /run/firepit/heartbeat.
+RuntimeDirectory=firepit
+RuntimeDirectoryMode=0755
+RuntimeDirectoryPreserve=restart
+
+# systemd-level watchdog: app sends WATCHDOG=1 via SystemdWatchdogPinger.
+# A hang past this interval → systemd kills & restarts (startup force-safe fires).
+WatchdogSec=10
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,226 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Fire Pit";
+}
+
+@* Markup is intentionally minimal + semantic. ALL styling lives in wwwroot/css/site.css
+   under the "Fire Pit control panel" section — edit there to re-theme. *@
+<div class="firepit">
+    <h1 class="fp-title">🔥 Fire Pit Control</h1>
+
+    <!-- ===== Gas shutoff ===== -->
+    <section class="fp-card">
+        <header class="fp-card-head">
+            <h2>Gas shutoff</h2>
+            <span id="gasBadge" class="fp-badge">…</span>
+        </header>
+        <div class="fp-btn-row">
+            <button id="btnOpen" class="fp-btn fp-btn--open">Open gas</button>
+            <button id="btnClose" class="fp-btn fp-btn--close">Close gas</button>
+        </div>
+        <p id="relays" class="fp-note">Relays: …</p>
+    </section>
+
+    <!-- ===== Igniter (manual dead-man) ===== -->
+    <section class="fp-card">
+        <header class="fp-card-head">
+            <h2>Igniter</h2>
+            <span id="igniterBadge" class="fp-badge">…</span>
+        </header>
+        <div class="fp-btn-row">
+            <button id="btnIgniter" class="fp-btn fp-btn--primary" style="touch-action:none;user-select:none">Hold to spark</button>
+        </div>
+        <p id="igniterRelays" class="fp-note">Relays: …</p>
+        <p class="fp-note">Manual: spark runs only while you hold the button; releasing, closing this tab, or a dropped connection cuts it within ~1.5s. Auto: with gas on and no flame detected by the camera, the controller also sparks by itself (see Flame below).</p>
+    </section>
+
+    <!-- ===== Flame detector (camera, read-only) + auto-ignition status ===== -->
+    <section class="fp-card">
+        <header class="fp-card-head">
+            <h2>Flame</h2>
+            <span id="flameBadge" class="fp-badge">…</span>
+        </header>
+        <p id="flameNote" class="fp-note">Camera flame detector: …</p>
+        <div id="flameFail" class="fp-error" hidden></div>
+        <div class="fp-btn-row">
+            <button id="btnAutoIgnite" class="fp-btn fp-btn--ghost">Auto-ignite: …</button>
+        </div>
+        <p class="fp-note">Auto-ignite sparks by itself when gas is on and no flame is seen. Turn it off in bright sunlight, when the camera may not see the flame; then use Hold to spark.</p>
+    </section>
+
+    <!-- ===== Flame level (ball valve) ===== -->
+    <section class="fp-card">
+        <header class="fp-card-head">
+            <h2>Flame level</h2>
+            <span id="valveBadge" class="fp-badge">…</span>
+        </header>
+
+        <div class="fp-valve-row">
+            <input type="range" class="fp-slider" id="valveSlider" min="0" max="100" step="1" value="0" />
+            <div class="fp-input-wrap">
+                <input type="number" class="fp-number" id="valveInput" min="0" max="100" step="1" value="0" />
+                <span class="fp-input-suffix">%</span>
+            </div>
+        </div>
+
+        <div class="fp-btn-row">
+            <button class="fp-btn fp-btn--ghost" data-nudge="-1">−1%</button>
+            <button class="fp-btn fp-btn--ghost" data-nudge="1">+1%</button>
+            <button id="btnSetValve" class="fp-btn fp-btn--primary">Set valve</button>
+        </div>
+        <p class="fp-note">
+            Actual position: <span id="valveActual">…</span>. The valve is a WiFi motor and
+            takes a few seconds to move; changes send when you release the slider or press Set.
+        </p>
+    </section>
+
+    <div id="err" class="fp-error" hidden></div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    const $ = id => document.getElementById(id);
+    const err = $('err');
+    function showErr(m) { if (m) { err.textContent = m; err.hidden = false; } else { err.hidden = true; } }
+
+    async function postJson(url, body) {
+        const r = await fetch(url, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: body ? JSON.stringify(body) : undefined
+        });
+        if (!r.ok) throw new Error(url + ' → ' + r.status);
+        return r.json();
+    }
+
+    // ---- Gas ----
+    function renderGas(s) {
+        const badge = $('gasBadge');
+        badge.textContent = s.gasRequested ? 'GAS ON' : (s.pending ? 'OPENING VALVE…' : 'GAS OFF');
+        badge.className = 'fp-badge ' + (s.gasRequested ? 'fp-badge--on' : (s.pending ? 'fp-badge--warn' : 'fp-badge--off'));
+        if (s.openError) showErr(s.openError);
+        const states = (s.channelStates || []).map((v, i) => `CH${i + 1}:${v ? 'ON' : 'off'}`).join('  ');
+        $('relays').textContent = 'Relays: ' + states + (s.simulated ? '  (SIMULATED)' : '');
+    }
+    async function refreshGas() {
+        try { const g = await (await fetch('/api/gas/status')).json(); renderGas(g); if (!g.openError) showErr(''); }
+        catch (e) { showErr('Gas status error: ' + e.message); }
+    }
+    $('btnOpen').onclick  = async () => { try { renderGas(await postJson('/api/gas/open'));  } catch (e) { showErr(e.message); } };
+    $('btnClose').onclick = async () => { try { renderGas(await postJson('/api/gas/close')); } catch (e) { showErr(e.message); } };
+
+    // ---- Igniter (manual dead-man: hold to spark) ----
+    const btnIgniter = $('btnIgniter');
+    let igniterPingTimer = null;
+
+    function renderIgniter(s) {
+        const badge = $('igniterBadge');
+        badge.textContent = s.active ? 'SPARKING' : 'OFF';
+        badge.className = 'fp-badge ' + (s.active ? 'fp-badge--on' : 'fp-badge--off');
+        const states = (s.channelStates || []).map((v, i) => `Relay ${String.fromCharCode(65 + i)}:${v ? 'ON' : 'off'}`).join('  ');
+        $('igniterRelays').textContent = 'Relays: ' + states + (s.simulated ? '  (SIMULATED)' : '');
+    }
+    async function refreshIgniter() {
+        try { renderIgniter(await (await fetch('/api/igniter/status')).json()); }
+        catch (e) { /* transient — keep quiet unless persistent */ }
+    }
+    async function igniterHold() {
+        try { renderIgniter(await postJson('/api/igniter/hold')); showErr(''); }
+        catch (e) { showErr('Igniter hold error: ' + e.message); }
+    }
+    async function igniterRelease() {
+        if (igniterPingTimer) { clearInterval(igniterPingTimer); igniterPingTimer = null; }
+        try { renderIgniter(await postJson('/api/igniter/release')); }
+        catch (e) { /* best-effort — server-side timeout is the real safety net */ }
+    }
+    function igniterStart(e) {
+        e.preventDefault();
+        if (igniterPingTimer) return; // already holding (e.g. duplicate pointer event)
+        igniterHold();
+        igniterPingTimer = setInterval(igniterHold, 500);
+    }
+    btnIgniter.addEventListener('pointerdown', igniterStart);
+    btnIgniter.addEventListener('pointerup', igniterRelease);
+    btnIgniter.addEventListener('pointercancel', igniterRelease);
+    btnIgniter.addEventListener('pointerleave', igniterRelease);
+    window.addEventListener('blur', igniterRelease);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) igniterRelease(); });
+
+    // ---- Flame detector (read-only) ----
+    function renderFlame(s) {
+        const badge = $('flameBadge');
+        if (s.flameFailure) { badge.textContent = 'FLAME FAILURE'; badge.className = 'fp-badge fp-badge--on'; }
+        else if (!s.available) { badge.textContent = 'NO CAMERA'; badge.className = 'fp-badge fp-badge--warn'; }
+        else if (s.present) { badge.textContent = 'FLAME'; badge.className = 'fp-badge fp-badge--off'; }
+        else { badge.textContent = 'NO FLAME'; badge.className = 'fp-badge'; }
+        const auto = {
+            disabled: 'detector disabled', idle: 'auto-ignite armed (gas off)', burning: 'burning — spark off', 'valve-opening': 'opening valve to 100% — spark waits',
+            sparking: 'sparking — waiting for flame' + (s.trialRemainingS != null ? ' (' + Math.ceil(s.trialRemainingS) + 's left)' : ''),
+            'no-flame': 'gas on, no flame (auto-ignite off)', lockout: 'locked out'
+        }[s.autoIgnite] || s.autoIgnite;
+        $('flameNote').textContent = 'Camera flame detector: ' + (s.available ? 'online' : 'offline' + (s.error ? ' (' + s.error + ')' : '')) +
+            ' · ' + auto + '. Advisory only — the pilot/thermocouple is the real safety.';
+        const f = $('flameFail');
+        f.hidden = !s.flameFailure;
+        if (s.flameFailure) f.textContent = 'No flame after the ignition trial — gas was closed. Press Open gas to try again.';
+    }
+    let autoIgniteOn = null;
+    function renderAutoIgnite(s) {
+        autoIgniteOn = !!s.autoIgniteEnabled;
+        const b = $('btnAutoIgnite');
+        b.textContent = 'Auto-ignite: ' + (autoIgniteOn ? 'ON' : 'OFF') + ' (tap to turn ' + (autoIgniteOn ? 'off' : 'on') + ')';
+        b.className = 'fp-btn ' + (autoIgniteOn ? 'fp-btn--primary' : 'fp-btn--ghost');
+    }
+    $('btnAutoIgnite').onclick = async () => {
+        if (autoIgniteOn === null) return;
+        try { const s = await postJson('/api/flame/auto-ignite', { enabled: !autoIgniteOn }); renderAutoIgnite(s); renderFlame(s); showErr(''); }
+        catch (e) { showErr('Auto-ignite setting error: ' + e.message); }
+    };
+    async function refreshFlame() {
+        try { const f = await (await fetch('/api/flame')).json(); renderFlame(f); renderAutoIgnite(f); }
+        catch (e) { /* transient — keep quiet */ }
+    }
+
+    // ---- Valve ----
+    const slider = $('valveSlider'), input = $('valveInput');
+    let dragging = false;
+    function clamp(n) { n = parseInt(n, 10); if (isNaN(n)) n = 0; return Math.max(0, Math.min(100, n)); }
+    function syncFrom(val) { const v = clamp(val); slider.value = v; input.value = v; return v; }
+
+    slider.addEventListener('input', () => { dragging = true; input.value = slider.value; });
+    slider.addEventListener('change', async () => { dragging = false; await setValve(clamp(slider.value)); });
+    input.addEventListener('change', async () => { await setValve(syncFrom(input.value)); });
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') input.blur(); });
+    document.querySelectorAll('[data-nudge]').forEach(b =>
+        b.onclick = () => setValve(syncFrom(clamp(slider.value) + parseInt(b.dataset.nudge, 10))));
+    $('btnSetValve').onclick = () => setValve(clamp(input.value));
+
+    function renderValve(s, isActual) {
+        const badge = $('valveBadge');
+        if (!s.online) { badge.textContent = 'OFFLINE'; badge.className = 'fp-badge fp-badge--warn'; }
+        else { badge.textContent = s.position + '%'; badge.className = 'fp-badge fp-badge--info'; }
+        $('valveActual').textContent = s.online ? s.position + '%' : ('offline' + (s.error ? ' (' + s.error + ')' : ''));
+        if (isActual && !dragging) syncFrom(s.position); // don't fight the user mid-drag
+    }
+    async function setValve(pct) {
+        try { renderValve(await postJson('/api/valve/position', { position: pct }), false); showErr(''); }
+        catch (e) { showErr('Valve set error: ' + e.message); }
+    }
+    let valvePolling = false;
+    async function refreshValve() {
+        if (valvePolling) return; // a slow valve must not stack up overlapping polls
+        valvePolling = true;
+        try { renderValve(await (await fetch('/api/valve/status')).json(), true); }
+        catch (e) { /* transient valve/network hiccups are common; keep quiet unless persistent */ }
+        finally { valvePolling = false; }
+    }
+
+    refreshGas(); refreshValve(); refreshIgniter(); refreshFlame();
+    setInterval(refreshFlame, 2000);
+    setInterval(refreshGas, 3000);
+    setInterval(refreshValve, 5000);
+    setInterval(refreshIgniter, 3000);
+})();
+</script>
+}
